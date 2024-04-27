@@ -3,27 +3,40 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 int runCommand(char* curCMD, int inputFD, int* outputFD, int isLast){
     int procID;
     int fds[2];
     
 	if (!isLast) { 
-        pipe(fds);
+        if(pipe(fds)==-1){
+            perror("pipe");
+            return errno;
+        }
     }
     procID=fork();
     
+    if(procID==-1){
+        perror("fork");
+        return errno;
+    }
 	if(procID == 0){ // Child process
         if(inputFD != 0){
-            dup2(inputFD, STDIN_FILENO);
-            close(inputFD);
+            if(dup2(inputFD, STDIN_FILENO)==-1){
+                perror("dup2");
+                return errno;
+            }
         }
         if (!isLast) {
-            dup2(fds[1], STDOUT_FILENO);
-            close(fds[1]); 
+            if(dup2(fds[1], STDOUT_FILENO)==-1){
+                perror("dup2");
+                return errno;
+            }
         }
 		close(fds[0]);
         execlp(curCMD, curCMD, NULL);
+        exit(1);
     } 
     else { // Parent 
         if (!isLast) {
